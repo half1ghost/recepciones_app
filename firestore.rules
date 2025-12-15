@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return isSignedIn() && (role() in ["admin", "operador"]);
+    }
+
+    match /actividades/{id} {
+      allow read: if isStaff();
+      allow write: if role() == "admin";
+    }
+
+    match /reservas/{id} {
+      allow read: if isStaff();
+      allow update: if isStaff();
+      allow create, delete: if role() == "admin";
+    }
+
+    match /users/{uid} {
+      allow read: if request.auth.uid == uid || role() == "admin";
+      allow write: if role() == "admin";
+      allow create: if request.auth != null
+  && request.auth.uid == uid
+  && request.resource.data.role == "operador";
+
+    }
+  }
+}
